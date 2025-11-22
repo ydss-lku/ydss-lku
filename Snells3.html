@@ -9,7 +9,7 @@
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance:none;height:24px;width:24px;border-radius:50%;
             background:#3b82f6;cursor:pointer;margin-top:-8px;box-shadow:0 2px 6px rgba(0,0,0,0.2);}
-        input[type=range]::-webkit-slider-runnable-track {11:59 22/11/2025
+        input[type=range]::-webkit-slider-runnable-track {
             width:100%;height:8px;cursor:pointer;background:#dbeafe;border-radius:4px;}
         input[type=range]:focus {outline:none;}
         #canvas-container {width:100%;height:100%;position:relative;touch-action:none;}
@@ -29,7 +29,12 @@
     </header>
     <main class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
         <div class="relative flex-1 bg-white m-2 lg:m-4 rounded-2xl shadow-inner border border-slate-200 overflow-hidden flex items-center justify-center" id="sim-area">
-            <div id="canvas-container"><canvas id="simCanvas"></canvas></div>
+            <div id="canvas-container" style="position:relative;">
+                <canvas id="simCanvas"></canvas>
+                <!-- 水印圖像 -->
+                <img src="yd-phy.png" alt="yd-phy watermark" 
+                    style="position:absolute; top:18px; right:0px; width:180px; opacity:0.52; pointer-events:none; z-index:20;">
+            </div>
             <div class="absolute top-4 left-4 pointer-events-none">
                 <div class="bg-white/80 backdrop-blur-sm p-2 rounded-lg shadow-sm border border-slate-100 text-sm">
                     <span class="font-bold text-slate-600">Medium 1</span><br>
@@ -168,7 +173,6 @@ function drawArrow(x1, y1, x2, y2, ratio) {
     ctx.stroke();
 }
 
-// 精確：canvas-angle mapping，確保弧線和標籤都分布在正確物理區域
 function draw() {
     ctx.clearRect(0, 0, width, height);
 
@@ -248,7 +252,6 @@ function draw() {
     }
 }
 
-// 優化：根據上下/物理區域保證標籤分布不重疊
 function drawPhysicalAngleArc(cx, cy, startDeg, endDeg, radius, color, text, above) {
     const startRad = startDeg * Math.PI / 180;
     const endRad = endDeg * Math.PI / 180;
@@ -277,7 +280,6 @@ function drawPhysicalAngleArc(cx, cy, startDeg, endDeg, radius, color, text, abo
     ctx.fillText(text, textX, textY);
 }
 
-// 按鍵控制顯示/隱藏Results結果
 showRBtn.addEventListener('click', function() {
     if (rValid) {
         resultRActual.innerText = rValue;
@@ -287,12 +289,10 @@ showRBtn.addEventListener('click', function() {
     resultRActual.style.display = "";
 });
 
-// 改變參數時即時隱藏結果
 function hideResults() {
     resultRActual.style.display = "none";
 }
 
-// 參數 event 改動，觸發即可
 inputAngle.addEventListener('input', function() { updateSimulation(); hideResults(); });
 inputN1.addEventListener('input', function() { updateSimulation(); hideResults(); });
 inputN2.addEventListener('input', function() { updateSimulation(); hideResults(); });
@@ -314,7 +314,7 @@ function updateSimulation() {
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 updateSimulation();
-hideResults(); // 初始載入隱藏
+hideResults();
 </script>
 </body>
 </html>
