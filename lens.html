@@ -1,0 +1,249 @@
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>凸透鏡成像模擬</title>
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-blue-50 min-h-screen flex items-center justify-center">
+  <div class="bg-white rounded-lg shadow-lg p-4 w-full max-w-4xl flex flex-col md:flex-row gap-4">
+    <!-- 模擬區 -->
+    <div class="flex-1 flex flex-col items-center">
+      <div class="text-blue-700 text-lg font-bold mb-2">模擬區：凸透鏡光路圖</div>
+      <canvas id="simCanvas" width="360" height="320" class="border-2 border-blue-500 rounded-lg touch-auto"></canvas>
+      <div class="text-sm text-gray-500 mt-2">拖動蠟燭可移動物體</div>
+    </div>
+
+    <!-- 控制區 -->
+    <div class="flex-1 flex flex-col gap-4">
+      <div class="text-blue-700 text-lg font-bold mb-2">控制區</div>
+      <!-- 焦距調節 -->
+      <label class="block mb-2 font-medium text-blue-600">焦距 f (cm)
+        <input id="focalSlider" type="range" min="20" max="100" value="60" step="1"
+          class="w-full accent-blue-500">
+        <span id="focalValue" class="inline-block ml-2 text-blue-700">60</span>
+      </label>
+      <!-- 物距調節 -->
+      <label class="block mb-2 font-medium text-blue-600">物距 u (cm)
+        <input id="objectSlider" type="range" min="25" max="200" value="120" step="1"
+          class="w-full accent-blue-500">
+        <span id="objectValue" class="inline-block ml-2 text-blue-700">120</span>
+      </label>
+      <div class="mt-2 text-gray-700">
+        <div class="mb-1">
+          <span class="font-semibold text-blue-600">像距 v：</span>
+          <span id="imageDist" class="text-blue-800"></span> cm
+        </div>
+        <div>
+          <span class="font-semibold text-blue-600">放大率 m：</span>
+          <span id="magnification" class="text-blue-800"></span>
+        </div>
+      </div>
+      <div class="mt-2 text-xs text-gray-500">滑桿即時調節，手機支援觸控拖曳。</div>
+    </div>
+  </div>
+  <script>
+    // 常數與初始值
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    let f = 60; // 焦距 (cm)
+    let u = 120; // 物距 (cm)
+    let draggingCandle = false;
+    let candleY = canvas.height / 2;
+    let candleX = canvas.width / 2 - 90; // 物體初始位置
+
+    // 控制區 Elements
+    const fSlider = document.getElementById('focalSlider');
+    const uSlider = document.getElementById('objectSlider');
+    const fValue = document.getElementById('focalValue');
+    const uValue = document.getElementById('objectValue');
+    const vText = document.getElementById('imageDist');
+    const mText = document.getElementById('magnification');
+
+    // 畫面設定
+    const lensX = canvas.width / 2; // 透鏡中心 X
+    const scale = 1.2;  // 1像素約1cm
+
+    function drawSimulation() {
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      // 畫主軸
+      ctx.strokeStyle = "#4F46E5";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, candleY);
+      ctx.lineTo(canvas.width, candleY);
+      ctx.stroke();
+
+      // 畫凸透鏡
+      ctx.save();
+      ctx.translate(lensX, candleY);
+      ctx.scale(1, 2.2);
+      ctx.beginPath();
+      ctx.arc(0, 0, 26, -Math.PI/2, Math.PI/2, true);
+      ctx.arc(0, 0, 26, Math.PI/2, -Math.PI/2, true);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#2563EB";
+      ctx.stroke();
+      ctx.restore();
+
+      // 畫焦點
+      drawMarker(lensX - f*scale, candleY, "F");
+      drawMarker(lensX + f*scale, candleY, "F'");
+
+      // 畫物體（蠟燭）
+      drawCandle(candleX, candleY);
+
+      // 光線繪製
+      drawRays();
+
+      // 計算像距和放大率
+      const objectDist = (lensX - candleX) / scale;
+      u = Math.round(objectDist);
+      const imageDist = (f * u) / (u - f);
+      const m = Math.abs(imageDist / u);
+      fValue.textContent = f;
+      uValue.textContent = u;
+      vText.textContent = (Math.round(imageDist * 10) / 10).toString();
+      mText.textContent = (Math.round(m * 100) / 100).toString();
+
+      // 畫像（箭頭）
+      const imageX = lensX + imageDist * scale;
+      const candleHeight = 46;
+      const imageHeight = candleHeight * m * (-Math.sign(imageDist));
+      drawArrow(imageX, candleY, imageHeight, "#F59E42", "像");
+    }
+
+    function drawCandle(x, y) {
+      const w = 20, h = 46;
+      ctx.save();
+      ctx.translate(x, y);
+      // 身體
+      ctx.fillStyle = "#EA4335";
+      ctx.fillRect(-w/2, -h, w, h);
+      // 火焰
+      ctx.beginPath();
+      ctx.arc(0, -h, 7, 0, 2*Math.PI, false);
+      ctx.fillStyle = "#FDE68A";
+      ctx.fill();
+      ctx.strokeStyle = "#F59E42";
+      ctx.stroke();
+      // 標記
+      ctx.font = "bold 18px sans-serif";
+      ctx.fillStyle = "#EA4335";
+      ctx.fillText("物", -w-10, -h/2);
+      ctx.restore();
+    }
+
+    function drawArrow(x, y, h, color, label) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -h);
+      ctx.stroke();
+      // 箭頭
+      ctx.beginPath();
+      ctx.moveTo(-6, -h + Math.sign(h)*12);
+      ctx.lineTo(0, -h);
+      ctx.lineTo(6, -h + Math.sign(h)*12);
+      ctx.stroke();
+      // 標記
+      ctx.font = "bold 17px sans-serif";
+      ctx.fillStyle = color;
+      ctx.fillText(label, 12, -h/2);
+      ctx.restore();
+    }
+
+    function drawRays() {
+      // 蠟燭頂到主軸（平行光線）
+      let from = {x: candleX, y: candleY - 46};
+      let to = {x: lensX, y: candleY - 46};
+      let outSlope = f * scale / (lensX - candleX);
+      // 平行光（折射後過 F')
+      drawLightRay(from.x, from.y, to.x, to.y, "#38BDF8");
+      // 折射過像
+      let imageDist = (f * u) / (u - f);
+      let imageX = lensX + imageDist*scale;
+      // 射出光
+      drawLightRay(to.x, to.y, imageX, candleY - 46 * (imageDist / u), "#38BDF8", true);
+
+      // 第二條光（經透鏡中心，直線不偏折）
+      drawLightRay(candleX, candleY - 46, lensX + (lensX - candleX), candleY - 46, "#22D3EE");
+
+      // 第三條光（過 F 到主軸平行）
+      let fx = lensX - f*scale;
+      drawLightRay(candleX, candleY - 46, fx, candleY, "#3B82F6");
+      drawLightRay(fx, candleY, lensX, candleY - 46, "#3B82F6");
+
+      // 補充光線
+      // ...
+    }
+
+    function drawLightRay(x1, y1, x2, y2, color, dashed=false) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      if (dashed) ctx.setLineDash([6,6]);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    function drawMarker(x, y, label) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, 2*Math.PI, false);
+      ctx.fillStyle = "#2563EB";
+      ctx.fill();
+      ctx.font = "bold 15px sans-serif";
+      ctx.fillStyle = "#2563EB";
+      ctx.fillText(label, x-6, y+24);
+      ctx.restore();
+    }
+
+    // 觸控/滑鼠拖動
+    canvas.addEventListener('pointerdown', function(e){
+      const rect = canvas.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      if (Math.abs(cx - candleX) < 24 && Math.abs(cy - (candleY-23)) < 50) {
+        draggingCandle = true;
+      }
+    });
+    window.addEventListener('pointermove', function(e){
+      if (!draggingCandle) return;
+      const rect = canvas.getBoundingClientRect();
+      let cx = e.clientX - rect.left;
+      // X方向拖曳，限制左側極限
+      cx = Math.max(48, Math.min(lensX - 22, cx));
+      candleX = cx;
+      drawSimulation();
+    });
+    window.addEventListener('pointerup', ()=>{ draggingCandle=false; });
+    canvas.addEventListener('touchstart', function(e){
+      e.preventDefault();
+    }, {passive: false});
+
+    // 控制桿事件
+    fSlider.addEventListener('input', e=>{
+      f = Number(e.target.value);
+      drawSimulation();
+    });
+    uSlider.addEventListener('input', e=>{
+      let val = Number(e.target.value);
+      candleX = lensX - val*scale;
+      drawSimulation();
+    });
+
+    // 初始繪製
+    drawSimulation();
+    window.addEventListener('resize', drawSimulation);
+  </script>
+</body>
+</html>
