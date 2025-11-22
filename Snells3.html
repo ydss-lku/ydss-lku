@@ -1,36 +1,31 @@
-<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Refraction Simulation 折射模擬</title>
+    <title>Refraction and Snell's Law 折射模擬器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         input[type=range] {-webkit-appearance:none;width:100%;background:transparent;}
         input[type=range]::-webkit-slider-thumb {
             -webkit-appearance:none;height:24px;width:24px;border-radius:50%;
             background:#3b82f6;cursor:pointer;margin-top:-8px;box-shadow:0 2px 6px rgba(0,0,0,0.2);}
-        input[type=range]::-webkit-slider-runnable-track {
+        input[type=range]::-webkit-slider-runnable-track {11:59 22/11/2025
             width:100%;height:8px;cursor:pointer;background:#dbeafe;border-radius:4px;}
         input[type=range]:focus {outline:none;}
         #canvas-container {width:100%;height:100%;position:relative;touch-action:none;}
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden">
-    <!-- Header加LOGO -->
     <header class="bg-white shadow-sm p-4 z-10 shrink-0">
-      <div class="max-w-7xl mx-auto flex justify-between items-center">
-        <div class="flex items-center gap-3">
-          <img src="yd-phy.png" alt="YD Physics Logo" class="h-12 w-auto mr-2 inline-block align-middle" />
-          <span class="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-            Refraction Simulation 折射模擬
-          </span>
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Refraction and Snell's Law 折射模擬器
+            </h1>
+            <span class="text-xs bg-blue-100 text-blue-800 py-1 px-2 rounded-full">HTML5 Simulation</span>
         </div>
-        <span class="text-xs bg-blue-100 text-blue-800 py-1 px-2 rounded-full">HTML5 Simulation</span>
-      </div>
     </header>
     <main class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
         <div class="relative flex-1 bg-white m-2 lg:m-4 rounded-2xl shadow-inner border border-slate-200 overflow-hidden flex items-center justify-center" id="sim-area">
@@ -38,7 +33,7 @@
             <div class="absolute top-4 left-4 pointer-events-none">
                 <div class="bg-white/80 backdrop-blur-sm p-2 rounded-lg shadow-sm border border-slate-100 text-sm">
                     <span class="font-bold text-slate-600">Medium 1</span><br>
-		            <span class="font-bold text-slate-600">媒介 1</span><br>
+                    <span class="font-bold text-slate-600">媒介 1</span><br>
                     <span class="text-xs text-slate-500">n₁ = <span id="display-n1-canvas">1.00</span></span>
                 </div>
             </div>
@@ -90,16 +85,17 @@
                     </div>
                 </div>
             </div>
+            <!-- Results 區塊，帶按鍵 -->
             <div class="mt-auto bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">計算結果 (Results)</h3>
                 <div class="space-y-2">
                     <div class="flex justify-between items-center">
-                        <span class="text-sm text-slate-600">Angle of Refraction (r):</span>
-                        <span class="text-lg font-mono font-bold text-blue-600" id="result-r" style="display:none;">--</span>
+                        <span class="text-sm text-slate-600">Angle of Refraction (r)<br>折射角(r):</span>
+                        <span class="text-lg font-mono font-bold text-blue-600" id="result-r-actual" style="display:none;">--</span>
                     </div>
-                    <button id="show-r-btn" type="button"
-                        class="mt-2 w-full px-2 py-1 bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-700 rounded font-bold text-sm transition"
-                    >顯示折射角 (Show r)</button>
+                    <button id="show-r-btn" class="mt-2 mb-2 w-full px-3 py-2 border border-blue-500 rounded bg-blue-100 text-blue-700 font-semibold hover:bg-blue-500 hover:text-white transition">
+                        Show Answer 顯示答案
+                    </button>
                     <div class="h-px bg-slate-200 my-2"></div>
                     <div class="text-xs text-slate-400 text-center">
                         Snell's Law: n₁ sin(i) = n₂ sin(r)
@@ -115,27 +111,20 @@ const container = document.getElementById('canvas-container');
 const inputAngle = document.getElementById('input-angle');
 const inputN1 = document.getElementById('input-n1');
 const inputN2 = document.getElementById('input-n2');
-
 const displayAngle = document.getElementById('val-angle');
 const displayN1 = document.getElementById('val-n1');
 const displayN2 = document.getElementById('val-n2');
 const displayN1Canvas = document.getElementById('display-n1-canvas');
 const displayN2Canvas = document.getElementById('display-n2-canvas');
-const resultR = document.getElementById('result-r');
+const resultRActual = document.getElementById('result-r-actual');
 const showRBtn = document.getElementById('show-r-btn');
 
 let angleI = 45;
 let n1 = 1.00;
 let n2 = 1.50;
 let width, height, centerX, centerY;
-let rReveal = false;
-
-showRBtn.addEventListener('click', function() {
-    resultR.style.display = '';
-    showRBtn.disabled = true;
-    showRBtn.classList.add('opacity-50','cursor-not-allowed');
-    rReveal = true;
-});
+let rValue = "--";           // 記錄 r (折射角) 數值
+let rValid = false;          // 是否有有效 r 值
 
 function resizeCanvas() {
     width = container.clientWidth;
@@ -179,6 +168,7 @@ function drawArrow(x1, y1, x2, y2, ratio) {
     ctx.stroke();
 }
 
+// 精確：canvas-angle mapping，確保弧線和標籤都分布在正確物理區域
 function draw() {
     ctx.clearRect(0, 0, width, height);
 
@@ -220,7 +210,7 @@ function draw() {
     ctx.stroke();
     drawArrow(startX, startY, centerX, centerY, .5);
 
-    // 入射角弧
+    // 入射角弧（上半＋標籤）
     drawPhysicalAngleArc(centerX, centerY, -90, -90 - angleI, 58, "#2563eb", `i = ${angleI}°`, true);
 
     const result = calculateRefraction();
@@ -234,7 +224,8 @@ function draw() {
         ctx.strokeStyle = "#dc2626";
         ctx.lineWidth = 3;
         ctx.stroke();
-        resultR.textContent = rReveal ? "TIR" : "--";
+        rValue = "TIR";
+        rValid = false;
     } else {
         const r = result.angleR;
         const radR = r * Math.PI / 180;
@@ -249,13 +240,15 @@ function draw() {
         ctx.stroke();
         drawArrow(centerX, centerY, endX, endY, 0.5);
 
-        // 折射角弧（下半＋正確標籤）
-        drawPhysicalAngleArc(centerX, centerY, 90, 90 - r, 58, "#2563eb", `r = ${r.toFixed(1)}°`, false);
+        // 折射角弧（下半＋標籤）
+        drawPhysicalAngleArc(centerX, centerY, 90, 90 - r, 58, "#2563eb", `r`, false);
 
-        resultR.textContent = rReveal ? `${r.toFixed(1)}°` : "--";
+        rValue = `${r.toFixed(1)}°`;
+        rValid = true;
     }
 }
 
+// 優化：根據上下/物理區域保證標籤分布不重疊
 function drawPhysicalAngleArc(cx, cy, startDeg, endDeg, radius, color, text, above) {
     const startRad = startDeg * Math.PI / 180;
     const endRad = endDeg * Math.PI / 180;
@@ -273,6 +266,7 @@ function drawPhysicalAngleArc(cx, cy, startDeg, endDeg, radius, color, text, abo
     const radMid = midAng * Math.PI / 180;
     let textX = cx + (radius + 22) * Math.cos(radMid);
     let textY = cy + (radius + 22) * Math.sin(radMid);
+    // 強制標籤分區域
     if (above && textY > cy - 10) textY = cy - 18;
     if (!above && textY < cy + 10) textY = cy + 18;
 
@@ -282,6 +276,26 @@ function drawPhysicalAngleArc(cx, cy, startDeg, endDeg, radius, color, text, abo
     ctx.textBaseline = "middle";
     ctx.fillText(text, textX, textY);
 }
+
+// 按鍵控制顯示/隱藏Results結果
+showRBtn.addEventListener('click', function() {
+    if (rValid) {
+        resultRActual.innerText = rValue;
+    } else {
+        resultRActual.innerText = '--';
+    }
+    resultRActual.style.display = "";
+});
+
+// 改變參數時即時隱藏結果
+function hideResults() {
+    resultRActual.style.display = "none";
+}
+
+// 參數 event 改動，觸發即可
+inputAngle.addEventListener('input', function() { updateSimulation(); hideResults(); });
+inputN1.addEventListener('input', function() { updateSimulation(); hideResults(); });
+inputN2.addEventListener('input', function() { updateSimulation(); hideResults(); });
 
 function updateSimulation() {
     angleI = parseFloat(inputAngle.value);
@@ -294,21 +308,13 @@ function updateSimulation() {
     displayN1Canvas.textContent = n1.toFixed(2);
     displayN2Canvas.textContent = n2.toFixed(2);
 
-    resultR.style.display = 'none';
-    showRBtn.disabled = false;
-    showRBtn.classList.remove('opacity-50','cursor-not-allowed');
-    rReveal = false;
-
     draw();
 }
-
-inputAngle.addEventListener('input', updateSimulation);
-inputN1.addEventListener('input', updateSimulation);
-inputN2.addEventListener('input', updateSimulation);
 
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 updateSimulation();
+hideResults(); // 初始載入隱藏
 </script>
 </body>
 </html>
