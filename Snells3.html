@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Refraction Simulation 折射模擬</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        input[type=range] {-webkit-appearance:none;width:100%;background:transparent;}
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance:none;height:24px;width:24px;border-radius:50%;
+            background:#3b82f6;cursor:pointer;margin-top:-8px;box-shadow:0 2px 6px rgba(0,0,0,0.2);}
+        input[type=range]::-webkit-slider-runnable-track {
+            width:100%;height:8px;cursor:pointer;background:#dbeafe;border-radius:4px;}
+        input[type=range]:focus {outline:none;}
+        #canvas-container {width:100%;height:100%;position:relative;touch-action:none;}
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden">
+    <!-- Header加LOGO -->
+    <header class="bg-white shadow-sm p-4 z-10 shrink-0">
+      <div class="max-w-7xl mx-auto flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <img src="yd-phy.png" alt="YD Physics Logo" class="h-12 w-auto mr-2 inline-block align-middle" />
+          <span class="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            Refraction Simulation 折射模擬
+          </span>
+        </div>
+        <span class="text-xs bg-blue-100 text-blue-800 py-1 px-2 rounded-full">HTML5 Simulation</span>
+      </div>
+    </header>
+    <main class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
+        <div class="relative flex-1 bg-white m-2 lg:m-4 rounded-2xl shadow-inner border border-slate-200 overflow-hidden flex items-center justify-center" id="sim-area">
+            <div id="canvas-container"><canvas id="simCanvas"></canvas></div>
+            <div class="absolute top-4 left-4 pointer-events-none">
+                <div class="bg-white/80 backdrop-blur-sm p-2 rounded-lg shadow-sm border border-slate-100 text-sm">
+                    <span class="font-bold text-slate-600">Medium 1</span><br>
+		            <span class="font-bold text-slate-600">媒介 1</span><br>
+                    <span class="text-xs text-slate-500">n₁ = <span id="display-n1-canvas">1.00</span></span>
+                </div>
+            </div>
+            <div class="absolute bottom-4 left-4 pointer-events-none">
+                <div class="bg-white/80 backdrop-blur-sm p-2 rounded-lg shadow-sm border border-slate-100 text-sm">
+                    <span class="font-bold text-blue-600">Medium 2</span><br>
+                    <span class="font-bold text-slate-600">媒介 2</span><br>
+                    <span class="text-xs text-slate-500">n₂ = <span id="display-n2-canvas">1.50</span></span>
+                </div>
+            </div>
+        </div>
+        <div class="w-full lg:w-80 bg-white p-6 shadow-lg z-20 flex flex-col gap-6 border-t lg:border-l border-slate-200 overflow-y-auto shrink-0">
+            <div>
+                <h2 class="text-lg font-semibold mb-4 text-slate-800 border-b pb-2">參數設定 (Controls)</h2>
+                <div class="mb-6">
+                    <div class="flex justify-between mb-2">
+                        <label class="text-sm font-medium text-slate-700">Angle of Incidence 入射角(i)</label>
+                        <span class="text-sm font-bold text-blue-600" id="val-angle">45°</span>
+                    </div>
+                    <input type="range" id="input-angle" min="0" max="85" value="45" step="1">
+                    <div class="flex justify-between text-xs text-slate-400 mt-1">
+                        <span>0°</span><span>85°</span>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <div class="mb-2">
+                        <div class="text-sm font-medium text-slate-700 leading-tight">Refractive Index of Medium 1 (n₁)</div>
+                        <div class="text-xs text-slate-500">媒介1的折射率(n₁)</div>
+                    </div>
+                    <div class="flex justify-between mb-1">
+                        <span class="text-sm font-bold text-blue-600" id="val-n1">1.00</span>
+                    </div>
+                    <input type="range" id="input-n1" min="1.00" max="1.33" value="1.00" step="0.01">
+                    <div class="flex justify-between text-xs text-slate-400 mt-1">
+                        <span>1.00</span><span>1.33</span>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <div class="mb-2">
+                        <div class="text-sm font-medium text-slate-700 leading-tight">Refractive Index of Medium 2 (n₂)</div>
+                        <div class="text-xs text-slate-500">媒介2的折射率(n₂)</div>
+                    </div>
+                    <div class="flex justify-between mb-1">
+                        <span class="text-sm font-bold text-blue-600" id="val-n2">1.50</span>
+                    </div>
+                    <input type="range" id="input-n2" min="1.50" max="2.20" value="1.50" step="0.01">
+                    <div class="flex justify-between text-xs text-slate-400 mt-1">
+                        <span>1.50</span><span>2.20</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-auto bg-slate-50 p-4 rounded-xl border border-slate-200">
+                <h3 class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">計算結果 (Results)</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-slate-600">Angle of Refraction (r):</span>
+                        <span class="text-lg font-mono font-bold text-blue-600" id="result-r" style="display:none;">--</span>
+                    </div>
+                    <button id="show-r-btn" type="button"
+                        class="mt-2 w-full px-2 py-1 bg-blue-100 hover:bg-blue-200 active:bg-blue-300 text-blue-700 rounded font-bold text-sm transition"
+                    >顯示折射角 (Show r)</button>
+                    <div class="h-px bg-slate-200 my-2"></div>
+                    <div class="text-xs text-slate-400 text-center">
+                        Snell's Law: n₁ sin(i) = n₂ sin(r)
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+<script>
+const canvas = document.getElementById('simCanvas');
+const ctx = canvas.getContext('2d');
+const container = document.getElementById('canvas-container');
+const inputAngle = document.getElementById('input-angle');
+const inputN1 = document.getElementById('input-n1');
+const inputN2 = document.getElementById('input-n2');
+
+const displayAngle = document.getElementById('val-angle');
+const displayN1 = document.getElementById('val-n1');
+const displayN2 = document.getElementById('val-n2');
+const displayN1Canvas = document.getElementById('display-n1-canvas');
+const displayN2Canvas = document.getElementById('display-n2-canvas');
+const resultR = document.getElementById('result-r');
+const showRBtn = document.getElementById('show-r-btn');
+
+let angleI = 45;
+let n1 = 1.00;
+let n2 = 1.50;
+let width, height, centerX, centerY;
+let rReveal = false;
+
+showRBtn.addEventListener('click', function() {
+    resultR.style.display = '';
+    showRBtn.disabled = true;
+    showRBtn.classList.add('opacity-50','cursor-not-allowed');
+    rReveal = true;
+});
+
+function resizeCanvas() {
+    width = container.clientWidth;
+    height = container.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    centerX = width / 2;
+    centerY = height / 2;
+    draw();
+}
+
+function calculateRefraction() {
+    const radI = angleI * Math.PI / 180;
+    const sinR = (n1 / n2) * Math.sin(radI);
+    let angleR;
+    let isTIR = false;
+    if (Math.abs(sinR) > 1) {
+        isTIR = true;
+        angleR = null;
+    } else {
+        angleR = Math.asin(sinR) * 180 / Math.PI;
+    }
+    return { angleR, isTIR };
+}
+
+function drawArrow(x1, y1, x2, y2, ratio) {
+    const x = x1 + (x2 - x1) * ratio;
+    const y = y1 + (y2 - y1) * ratio;
+    const angle = Math.atan2(y2 - y1, x2 - x1);
+    const headLen = 10;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - headLen * Math.cos(angle - Math.PI / 6), y - headLen * Math.sin(angle - Math.PI / 6));
+    ctx.moveTo(x, y);
+    ctx.lineTo(x - headLen * Math.cos(angle + Math.PI / 6), y - headLen * Math.sin(angle + Math.PI / 6));
+    ctx.strokeStyle = "#dc2626";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, width, height);
+
+    const n1Opacity = (n1 - 1.0) * 0.5;
+    ctx.fillStyle = `rgba(219,234,254,${0.3 + n1Opacity})`;
+    ctx.fillRect(0, 0, width, centerY);
+
+    const n2Opacity = (n2 - 1.0) * 0.8;
+    ctx.fillStyle = `rgba(191,219,254,${0.3 + n2Opacity})`;
+    ctx.fillRect(0, centerY, width, height - centerY);
+
+    ctx.beginPath();
+    ctx.moveTo(0, centerY);
+    ctx.lineTo(width, centerY);
+    ctx.strokeStyle = "#64748b";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.setLineDash([5, 5]);
+    ctx.moveTo(centerX, 20);
+    ctx.lineTo(centerX, height - 20);
+    ctx.strokeStyle = "#94a3b8";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const rayLength = Math.min(width, height) * 0.45;
+    const radI = angleI * Math.PI / 180;
+    const startX = centerX - rayLength * Math.sin(radI);
+    const startY = centerY - rayLength * Math.cos(radI);
+
+    // 入射線
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(centerX, centerY);
+    ctx.strokeStyle = "#dc2626";
+    ctx.lineWidth = 5;
+    ctx.stroke();
+    drawArrow(startX, startY, centerX, centerY, .5);
+
+    // 入射角弧
+    drawPhysicalAngleArc(centerX, centerY, -90, -90 - angleI, 58, "#2563eb", `i = ${angleI}°`, true);
+
+    const result = calculateRefraction();
+
+    if (result.isTIR) {
+        ctx.beginPath();
+        const endX = centerX + rayLength * Math.sin(radI);
+        const endY = centerY - rayLength * Math.cos(radI);
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(endX, endY);
+        ctx.strokeStyle = "#dc2626";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        resultR.textContent = rReveal ? "TIR" : "--";
+    } else {
+        const r = result.angleR;
+        const radR = r * Math.PI / 180;
+        const endX = centerX + rayLength * Math.sin(radR);
+        const endY = centerY + rayLength * Math.cos(radR);
+
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.lineTo(endX, endY);
+        ctx.strokeStyle = "#dc2626";
+        ctx.lineWidth = 5;
+        ctx.stroke();
+        drawArrow(centerX, centerY, endX, endY, 0.5);
+
+        // 折射角弧（下半＋正確標籤）
+        drawPhysicalAngleArc(centerX, centerY, 90, 90 - r, 58, "#2563eb", `r = ${r.toFixed(1)}°`, false);
+
+        resultR.textContent = rReveal ? `${r.toFixed(1)}°` : "--";
+    }
+}
+
+function drawPhysicalAngleArc(cx, cy, startDeg, endDeg, radius, color, text, above) {
+    const startRad = startDeg * Math.PI / 180;
+    const endRad = endDeg * Math.PI / 180;
+    let ccw = false;
+    let delta = (endRad - startRad + 2 * Math.PI) % (2 * Math.PI);
+    if (delta > Math.PI) ccw = true;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, startRad, endRad, ccw);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const midAng = (startDeg + endDeg) / 2;
+    const radMid = midAng * Math.PI / 180;
+    let textX = cx + (radius + 22) * Math.cos(radMid);
+    let textY = cy + (radius + 22) * Math.sin(radMid);
+    if (above && textY > cy - 10) textY = cy - 18;
+    if (!above && textY < cy + 10) textY = cy + 18;
+
+    ctx.font = "13px sans-serif";
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, textX, textY);
+}
+
+function updateSimulation() {
+    angleI = parseFloat(inputAngle.value);
+    n1 = parseFloat(inputN1.value);
+    n2 = parseFloat(inputN2.value);
+
+    displayAngle.textContent = `${angleI}°`;
+    displayN1.textContent = n1.toFixed(2);
+    displayN2.textContent = n2.toFixed(2);
+    displayN1Canvas.textContent = n1.toFixed(2);
+    displayN2Canvas.textContent = n2.toFixed(2);
+
+    resultR.style.display = 'none';
+    showRBtn.disabled = false;
+    showRBtn.classList.remove('opacity-50','cursor-not-allowed');
+    rReveal = false;
+
+    draw();
+}
+
+inputAngle.addEventListener('input', updateSimulation);
+inputN1.addEventListener('input', updateSimulation);
+inputN2.addEventListener('input', updateSimulation);
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+updateSimulation();
+</script>
+</body>
+</html>
