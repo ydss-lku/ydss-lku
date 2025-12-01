@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HKDSE Physics: Refraction Simulator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Modern Slider Styling */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+        input[type=range]:focus { outline: none; }
+        
+        /* Slider Track */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 6px;
+            cursor: pointer;
+            background: #e2e8f0;
+            border-radius: 999px;
+        }
+        
+        /* Slider Thumb (Large for iPad Touch) */
+        input[type=range]::-webkit-slider-thumb {
+            height: 28px;
+            width: 28px;
+            border-radius: 50%;
+            background: #0f172a;
+            border: 2px solid #fff;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -11px; /* Center thumb on track */
+        }
+
+        /* Hide scrollbar for clean app-feel */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+        /* Font optimization */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        
+        /* Animation for mode switching */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body class="bg-slate-50 h-screen flex flex-col overflow-hidden text-slate-800">
+
+    <!-- Header -->
+    <header class="bg-white/90 backdrop-blur-md border-b border-slate-200 z-20 shrink-0 h-14 flex items-center px-6 justify-between">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 text-white p-1.5 rounded-lg">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+            </div>
+            <h1 class="font-bold text-slate-800 text-lg tracking-tight">Refraction <span class="text-slate-400 font-light">|</span> 折射模擬</h1>
+        </div>
+        <div class="text-xs font-mono text-slate-400">HKDSE Physics</div>
+    </header>
+
+    <main class="flex-1 flex flex-col lg:flex-row h-full overflow-hidden">
+        
+        <!-- Simulation Canvas Area -->
+        <div class="relative flex-1 bg-slate-100 m-3 lg:m-4 rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex items-center justify-center">
+            <div id="canvas-container" class="w-full h-full relative">
+                <canvas id="simCanvas"></canvas>
+                
+                <!-- Watermark -->
+                <div class="absolute top-4 right-4 z-10 pointer-events-none select-none opacity-50 mix-blend-multiply flex flex-col items-end">
+    <img src="yd-phy.png" alt="yd-phy watermark" class="w-40 mb-1">
+    <span class="text-[10px] font-semibold text-slate-600 uppercase tracking-wider leading-tight">Designed and created by LKU</span>
+    <span class="text-[10px] font-semibold text-slate-600 uppercase tracking-wider leading-tight">with Gemini 3 Pro</span>
+		</div>
+
+                <!-- Floating Labels (Mediums) -->
+                <div class="absolute top-6 left-6 pointer-events-none">
+                    <div class="bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl shadow-sm border border-slate-100">
+                        <div class="flex flex-col">
+                            <span class="text-xs uppercase tracking-wider font-bold text-slate-400">Medium 1</span>
+                            <span class="text-sm font-semibold text-slate-700">媒介 1 (n₁)</span>
+                            <span class="text-lg font-mono font-bold text-blue-600" id="display-n1-canvas">1.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="absolute bottom-6 left-6 pointer-events-none">
+                    <div class="bg-white/80 backdrop-blur-md px-4 py-2 rounded-xl shadow-sm border border-slate-100">
+                        <div class="flex flex-col">
+                            <span class="text-xs uppercase tracking-wider font-bold text-slate-400">Medium 2</span>
+                            <span class="text-sm font-semibold text-slate-700">媒介 2 (n₂)</span>
+                            <!-- This ID is important for toggling visibility -->
+                            <span class="text-lg font-mono font-bold text-teal-600" id="display-n2-canvas">1.50</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel (Sidebar) -->
+        <div class="w-full lg:w-[360px] bg-white z-10 flex flex-col border-t lg:border-t-0 lg:border-l border-slate-200 shadow-xl shrink-0">
+            
+            <!-- MODE SWITCHER -->
+            <div class="p-4 border-b border-slate-100 bg-slate-50/50">
+                <div class="flex bg-slate-200/60 p-1 rounded-xl">
+                    <button onclick="setMode('find_r')" id="btn-mode-r" class="flex-1 py-2 text-sm font-bold rounded-lg shadow-sm bg-white text-blue-600 transition-all">
+                        Find r (找折射角)
+                    </button>
+                    <button onclick="setMode('find_n')" id="btn-mode-n" class="flex-1 py-2 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all">
+                        Find n (找折射率)
+                    </button>
+                </div>
+            </div>
+
+            <div class="p-6 overflow-y-auto flex-1">
+                <h2 class="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6">Settings 參數設定</h2>
+
+                <!-- Control: n1 -->
+                <div class="mb-8 group">
+                    <div class="flex justify-between items-end mb-3">
+                        <div>
+                            <div class="text-sm font-bold text-slate-700">Refractive Index <span class="text-slate-400 font-light">n₁</span></div>
+                            <div class="text-xs text-slate-500 mt-0.5">媒介 1 折射率</div>
+                        </div>
+                        <span class="text-xl font-mono font-bold text-blue-600 bg-blue-50 px-2 rounded" id="val-n1">1.00</span>
+                    </div>
+                    <input type="range" id="input-n1" min="1.00" max="1.50" value="1.00" step="0.01">
+                </div>
+
+                <!-- Control: n2 (Behavior changes based on mode) -->
+                <div class="mb-8 group">
+                    <div class="flex justify-between items-end mb-3">
+                        <div>
+                            <div class="text-sm font-bold text-slate-700">Refractive Index <span class="text-slate-400 font-light">n₂</span></div>
+                            <div class="text-xs text-slate-500 mt-0.5">媒介 2 折射率</div>
+                        </div>
+                        <span class="text-xl font-mono font-bold text-teal-600 bg-teal-50 px-2 rounded" id="val-n2">1.50</span>
+                    </div>
+                    <input type="range" id="input-n2" min="1.00" max="2.42" value="1.50" step="0.01">
+                    <div class="flex justify-between text-[10px] text-slate-400 mt-2 font-mono">
+                        <span>Air (1.0)</span>
+                        <span>Diamond (2.42)</span>
+                    </div>
+                </div>
+
+                <!-- Control: Angle -->
+                <div class="mb-6 group">
+                    <div class="flex justify-between items-end mb-3">
+                        <div>
+                            <div class="text-sm font-bold text-slate-700">Incidence Angle <span class="text-slate-400 font-light">i</span></div>
+                            <div class="text-xs text-slate-500 mt-0.5">入射角</div>
+                        </div>
+                        <span class="text-xl font-mono font-bold text-rose-600 bg-rose-50 px-2 rounded" id="val-angle">45.0°</span>
+                    </div>
+                    <input type="range" id="input-angle" min="0" max="89.9" value="45.0" step="0.1">
+                </div>
+            </div>
+
+            <!-- Results Section (Dynamic) -->
+            <div class="bg-slate-50 border-t border-slate-200 p-6">
+                <div class="mb-4">
+                    <!-- Result Header -->
+                    <div class="flex justify-between items-center mb-2 fade-in" id="result-label-container">
+                        <div>
+                            <div class="text-sm font-bold text-slate-700" id="result-title">Refraction Angle (r)</div>
+                            <div class="text-xs text-slate-500" id="result-subtitle">折射角</div>
+                        </div>
+                        <span id="result-value" class="text-2xl font-mono font-bold text-slate-800 tracking-tight hidden">--</span>
+                    </div>
+                    
+                    <button id="show-ans-btn" class="w-full py-3 px-4 bg-white border-2 border-slate-200 hover:border-blue-500 hover:text-blue-600 text-slate-600 font-bold rounded-xl transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                            <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+                        </svg>
+                        Show Answer 顯示答案
+                    </button>
+                </div>
+                
+                <div class="text-center pt-3 border-t border-slate-200">
+                    <code class="text-xs text-slate-500 font-mono">n₁·sin(i) = n₂·sin(r)</code>
+                </div>
+            </div>
+        </div>
+    </main>
+
+<script>
+    // --- Configuration & Setup ---
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('canvas-container');
+    
+    // Inputs
+    const inputAngle = document.getElementById('input-angle');
+    const inputN1 = document.getElementById('input-n1');
+    const inputN2 = document.getElementById('input-n2');
+    
+    // Displays
+    const displayAngle = document.getElementById('val-angle');
+    const displayN1 = document.getElementById('val-n1');
+    const displayN2 = document.getElementById('val-n2');
+    const displayN1Canvas = document.getElementById('display-n1-canvas');
+    const displayN2Canvas = document.getElementById('display-n2-canvas');
+    
+    // Results & Mode
+    const resultTitle = document.getElementById('result-title');
+    const resultSubtitle = document.getElementById('result-subtitle');
+    const resultValue = document.getElementById('result-value');
+    const showAnsBtn = document.getElementById('show-ans-btn');
+    const btnModeR = document.getElementById('btn-mode-r');
+    const btnModeN = document.getElementById('btn-mode-n');
+
+    // State Variables
+    let currentMode = 'find_r'; // 'find_r' or 'find_n'
+    let angleI = 45;
+    let n1 = 1.00;
+    let n2 = 1.50;
+    let width, height, centerX, centerY;
+    
+    // Calculation Results
+    let calculatedR = 0;
+    let isTIR = false;
+    let answerRevealed = false;
+
+    // --- Mode Switching Logic ---
+    function setMode(mode) {
+        currentMode = mode;
+        answerRevealed = false;
+        
+        // Update Button Styles
+        if (mode === 'find_r') {
+            btnModeR.className = "flex-1 py-2 text-sm font-bold rounded-lg shadow-sm bg-white text-blue-600 transition-all";
+            btnModeN.className = "flex-1 py-2 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all";
+            
+            // Labels for Results
+            resultTitle.innerText = "Refraction Angle (r)";
+            resultSubtitle.innerText = "折射角";
+        } else {
+            btnModeR.className = "flex-1 py-2 text-sm font-bold rounded-lg text-slate-500 hover:text-slate-700 transition-all";
+            btnModeN.className = "flex-1 py-2 text-sm font-bold rounded-lg shadow-sm bg-white text-blue-600 transition-all";
+            
+            // Labels for Results
+            resultTitle.innerText = "Refractive Index (n₂)";
+            resultSubtitle.innerText = "媒介2 折射率";
+        }
+
+        updateSimulation();
+    }
+
+    // --- Core Physics Logic ---
+    function calculateRefraction() {
+        const radI = angleI * Math.PI / 180;
+        const sinR = (n1 / n2) * Math.sin(radI);
+        
+        let angleR;
+        let tir = false;
+
+        if (Math.abs(sinR) > 1.000001) { 
+            tir = true;
+            angleR = null;
+        } else {
+            angleR = Math.asin(Math.min(1, Math.max(-1, sinR))) * 180 / Math.PI;
+        }
+        return { angleR, tir };
+    }
+
+    // --- Drawing Functions ---
+    function resizeCanvas() {
+        const dpr = window.devicePixelRatio || 1;
+        width = container.clientWidth;
+        height = container.clientHeight;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        centerX = width / 2;
+        centerY = height / 2;
+        draw();
+    }
+
+    function drawArrow(x1, y1, x2, y2, ratio, color) {
+        const x = x1 + (x2 - x1) * ratio;
+        const y = y1 + (y2 - y1) * ratio;
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const headLen = 12;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - headLen * Math.cos(angle - Math.PI / 6), y - headLen * Math.sin(angle - Math.PI / 6));
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - headLen * Math.cos(angle + Math.PI / 6), y - headLen * Math.sin(angle + Math.PI / 6));
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+
+        // 1. Draw Mediums
+        const grad1 = ctx.createLinearGradient(0, 0, 0, centerY);
+        const opacity1 = 0.05 + (n1 - 1) * 0.2; 
+        grad1.addColorStop(0, `rgba(59, 130, 246, ${opacity1})`);
+        grad1.addColorStop(1, `rgba(59, 130, 246, ${opacity1 + 0.1})`);
+        ctx.fillStyle = grad1;
+        ctx.fillRect(0, 0, width, centerY);
+
+        const grad2 = ctx.createLinearGradient(0, centerY, 0, height);
+        // Note: In find_n mode, we still draw density visually, but hide number
+        const opacity2 = 0.1 + (n2 - 1) * 0.3;
+        grad2.addColorStop(0, `rgba(13, 148, 136, ${opacity2})`);
+        grad2.addColorStop(1, `rgba(13, 148, 136, ${opacity2 + 0.15})`);
+        ctx.fillStyle = grad2;
+        ctx.fillRect(0, centerY, width, height - centerY);
+
+        // Lines
+        ctx.beginPath();
+        ctx.moveTo(0, centerY);
+        ctx.lineTo(width, centerY);
+        ctx.strokeStyle = "rgba(15, 23, 42, 0.2)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.setLineDash([8, 6]);
+        ctx.moveTo(centerX, 40);
+        ctx.lineTo(centerX, height - 40);
+        ctx.strokeStyle = "rgba(100, 116, 139, 0.6)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Ray Math
+        const rayLength = Math.min(width, height) * 0.42;
+        const radI = angleI * Math.PI / 180;
+        const startX = centerX - rayLength * Math.sin(radI);
+        const startY = centerY - rayLength * Math.cos(radI);
+        const rayColor = "#e11d48"; 
+
+        // 2. Incident Ray
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = rayColor;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(centerX, centerY);
+        ctx.strokeStyle = rayColor;
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        drawArrow(startX, startY, centerX, centerY, 0.5, "white");
+
+        // Incident Angle Label
+        drawAngleArc(centerX, centerY, -90, -90 - angleI, 60, "#3b82f6", `i=${angleI.toFixed(1)}°`, true);
+
+        // 3. Refracted Ray
+        const result = calculateRefraction();
+        calculatedR = result.angleR;
+        isTIR = result.tir;
+
+        if (isTIR) {
+            const endX = centerX + rayLength * Math.sin(radI);
+            const endY = centerY - rayLength * Math.cos(radI);
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = rayColor;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(endX, endY);
+            ctx.strokeStyle = rayColor;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            drawArrow(centerX, centerY, endX, endY, 0.5, "white");
+            
+            ctx.fillStyle = "#e11d48";
+            ctx.font = "bold 14px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("Total Internal Reflection (全內反射)", centerX, centerY - 20);
+        } else {
+            const r = calculatedR;
+            const radR = r * Math.PI / 180;
+            const endX = centerX + rayLength * Math.sin(radR);
+            const endY = centerY + rayLength * Math.cos(radR);
+
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = rayColor;
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.lineTo(endX, endY);
+            ctx.strokeStyle = rayColor;
+            ctx.lineWidth = 4;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            drawArrow(centerX, centerY, endX, endY, 0.5, "white");
+
+            // --- KEY LOGIC: Labeling r based on mode ---
+            let rLabel = "";
+            if (currentMode === 'find_r') {
+                // If finding r, hide the value (show only 'r')
+                rLabel = "r";
+            } else {
+                // If finding n, student needs r to solve it. Show value.
+                rLabel = `r=${r.toFixed(1)}°`;
+            }
+            
+            drawAngleArc(centerX, centerY, 90, 90 - r, 60, "#0d9488", rLabel, false);
+        }
+    }
+
+    function drawAngleArc(cx, cy, startDeg, endDeg, radius, color, text, isIncident) {
+        const startRad = startDeg * Math.PI / 180;
+        const endRad = endDeg * Math.PI / 180;
+        let ccw = false;
+        let delta = (endRad - startRad + 2 * Math.PI) % (2 * Math.PI);
+        if (delta > Math.PI) ccw = true;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, startRad, endRad, ccw);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        const midAng = (startDeg + endDeg) / 2;
+        const radMid = midAng * Math.PI / 180;
+        let textRadius = radius + 25;
+        let textX = cx + textRadius * Math.cos(radMid);
+        let textY = cy + textRadius * Math.sin(radMid);
+
+        if (isIncident && textY > cy - 15) textY = cy - 20;
+        if (!isIncident && textY < cy + 15) textY = cy + 20;
+
+        ctx.font = "bold 12px system-ui";
+        const textMetrics = ctx.measureText(text);
+        const bgPadding = 4;
+        
+        ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.beginPath();
+        ctx.roundRect(textX - textMetrics.width/2 - bgPadding, textY - 10, textMetrics.width + bgPadding*2, 20, 6);
+        ctx.fill();
+
+        ctx.fillStyle = color;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text, textX, textY);
+    }
+
+    // --- Interaction & Updates ---
+
+    showAnsBtn.addEventListener('click', function() {
+        answerRevealed = true;
+        updateResultsDisplay();
+    });
+
+    function updateResultsDisplay() {
+        if (!answerRevealed) {
+            resultValue.classList.add('hidden');
+            showAnsBtn.classList.remove('hidden');
+            return;
+        }
+
+        resultValue.classList.remove('hidden');
+        showAnsBtn.classList.add('hidden');
+
+        if (currentMode === 'find_r') {
+            // Answer is R
+            if (isTIR) {
+                resultValue.innerText = "TIR";
+            } else {
+                resultValue.innerText = `${calculatedR.toFixed(1)}°`;
+            }
+        } else {
+            // Answer is N2
+            resultValue.innerText = n2.toFixed(2);
+        }
+    }
+
+    function updateSimulation() {
+        // Read Inputs
+        angleI = parseFloat(inputAngle.value);
+        n1 = parseFloat(inputN1.value);
+        n2 = parseFloat(inputN2.value);
+
+        // Update Text Displays
+        displayAngle.textContent = `${angleI.toFixed(1)}°`;
+        displayN1.textContent = n1.toFixed(2);
+        displayN1Canvas.textContent = n1.toFixed(2);
+
+        // Condition Handling for n2 based on mode
+        if (currentMode === 'find_r') {
+            // Mode: Finding R. We know N2, so show it everywhere.
+            displayN2.textContent = n2.toFixed(2);
+            displayN2Canvas.textContent = n2.toFixed(2);
+        } else {
+            // Mode: Finding N. Hide N2 everywhere until revealed.
+            displayN2.textContent = "???";
+            displayN2Canvas.textContent = "?";
+        }
+
+        // Reset answer state when inputs change
+        if (answerRevealed) {
+            answerRevealed = false;
+        }
+        updateResultsDisplay();
+
+        draw();
+    }
+
+    // Listeners
+    inputAngle.addEventListener('input', updateSimulation);
+    inputN1.addEventListener('input', updateSimulation);
+    inputN2.addEventListener('input', updateSimulation);
+    window.addEventListener('resize', resizeCanvas);
+    
+    // Init
+    setTimeout(() => {
+        resizeCanvas();
+        updateSimulation();
+    }, 50);
+
+</script>
+</body>
+</html>
