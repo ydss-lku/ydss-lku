@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>雙脈衝測速模擬 (Fixed)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* CRO 網格背景 */
+        .cro-screen {
+            background-color: #0f172a;
+            background-image: 
+                linear-gradient(rgba(51, 65, 85, 0.5) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(51, 65, 85, 0.5) 1px, transparent 1px);
+            background-size: 40px 40px;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+            border-radius: 6px;
+        }
+        button { touch-action: manipulation; }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans h-screen flex flex-col overflow-hidden selection:bg-blue-100">
+
+    <header class="bg-white border-b border-slate-200 px-4 py-3 flex-none flex justify-between items-center shadow-sm z-10">
+        <h1 class="text-xl font-bold text-blue-700 flex items-center gap-2">
+            <span>🚓</span> 雙脈衝測速原理 (Two-Pulse Method)
+        </h1>
+        <div class="text-xs text-slate-500 hidden sm:block">HTML5 Physics Lab</div>
+    </header>
+
+    <main class="flex-grow p-3 flex gap-3 w-full h-full overflow-hidden flex-col md:flex-row">
+        
+        <div class="flex-grow flex flex-col gap-3 h-full overflow-hidden">
+            
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 relative flex-none h-[100px] flex flex-col justify-center">
+                <div class="absolute top-1 left-2 z-10 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    物理場景 (Scene)
+                </div>
+                <canvas id="sceneCanvas" class="w-full h-full rounded bg-slate-50"></canvas>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm border border-slate-200 flex-grow flex flex-col p-2 min-h-0">
+                <div class="flex justify-between items-center mb-1 px-1 flex-none">
+                    <span class="text-xs font-bold text-slate-600">示波器 (CRO) - Vertical Offset Mode</span>
+                    <div class="flex gap-3 text-[10px] font-mono">
+                        <span class="text-green-500 flex items-center gap-1">● Pulse 1 (Top)</span>
+                        <span class="text-amber-400 flex items-center gap-1">● Pulse 2 (Bottom)</span>
+                    </div>
+                </div>
+                <div class="relative w-full flex-grow rounded overflow-hidden cro-screen">
+                    <canvas id="croCanvas" class="absolute inset-0 w-full h-full"></canvas>
+                    
+                    <div class="absolute left-2 top-[30%] text-[10px] text-green-500/70 font-mono">CH1</div>
+                    <div class="absolute left-2 top-[65%] text-[10px] text-amber-500/70 font-mono">CH2</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full md:w-[280px] flex-none flex flex-col gap-3 h-full overflow-y-auto pb-4 md:pb-0">
+            
+            <div class="bg-white rounded-lg shadow-sm p-4 border border-slate-200">
+                <h2 class="text-sm font-bold text-slate-700 mb-3 border-b pb-2">控制台 (Controls)</h2>
+                
+                <button id="measureBtn" class="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold rounded shadow transition-all flex items-center justify-center gap-2 mb-4">
+                    <span>⏱️</span> 開始測速 (Measure)
+                </button>
+
+                <div class="mb-4">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-xs font-semibold text-slate-600">汽車速度 (Car Speed)</label>
+                        <span id="speedVal" class="text-xs font-mono text-blue-600 font-bold">15 m/s</span>
+                    </div>
+                    <input type="range" id="speedInput" min="0" max="40" value="15" step="1" 
+                        class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                </div>
+                
+                <div class="mb-2">
+                    <div class="flex justify-between mb-1">
+                        <label class="text-xs font-semibold text-slate-600">發射間隔 (ΔT)</label>
+                        <span id="intervalVal" class="text-xs font-mono text-slate-500">1.0 s</span>
+                    </div>
+                    <input type="range" id="intervalInput" min="0.5" max="2.0" value="1.0" step="0.1" 
+                        class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-400">
+                </div>
+
+                <button id="resetSimBtn" class="mt-2 w-full py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded border border-slate-300 transition-colors">
+                    重置 (Reset)
+                </button>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-sm p-4 border border-slate-200 flex-grow">
+                <h3 class="text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider">測量數據 (Data)</h3>
+                
+                <div class="space-y-3">
+                    <div class="p-2 bg-green-50 rounded border border-green-100 relative">
+                        <div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-green-500"></div>
+                        <div class="text-[10px] text-green-700 font-bold mb-1">Pulse 1</div>
+                        <div class="flex justify-between text-xs font-mono text-slate-700">
+                            <span>Time (t₁):</span> <span id="t1_disp" class="font-bold">--</span>
+                        </div>
+                        <div class="flex justify-between text-xs font-mono text-slate-700">
+                            <span>Dist (d₁):</span> <span id="d1_disp" class="font-bold">--</span>
+                        </div>
+                    </div>
+
+                    <div class="p-2 bg-amber-50 rounded border border-amber-100 relative">
+                        <div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-400"></div>
+                        <div class="text-[10px] text-amber-700 font-bold mb-1">Pulse 2</div>
+                        <div class="flex justify-between text-xs font-mono text-slate-700">
+                            <span>Time (t₂):</span> <span id="t2_disp" class="font-bold">--</span>
+                        </div>
+                        <div class="flex justify-between text-xs font-mono text-slate-700">
+                            <span>Dist (d₂):</span> <span id="d2_disp" class="font-bold">--</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-2 border-t border-slate-200">
+                        <div class="flex justify-between items-end">
+                            <div class="text-[10px] text-slate-400">Speed (v)</div>
+                            <div class="text-xl font-bold text-blue-700 font-mono" id="v_calc">--</div>
+                        </div>
+                        <div class="text-[9px] text-slate-400 mt-1 text-right">v = (d₂ - d₁) / ΔT</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // --- 1. 參數設定 ---
+        const SOUND_SPEED = 340; // m/s
+        const PIXELS_PER_METER = 4; // 1m = 4px (Screen Scale)
+        const CRO_MAX_TIME = 1000; // CRO 顯示 1000ms 窗口
+        const PULSE_RADIUS = 6; // 脈衝半徑
+        const CAR_WIDTH = 50; // 車身長度
+        const CAR_HEIGHT = 26;
+
+        // --- 2. DOM ---
+        const sceneCanvas = document.getElementById('sceneCanvas');
+        const sceneCtx = sceneCanvas.getContext('2d');
+        const croCanvas = document.getElementById('croCanvas');
+        const croCtx = croCanvas.getContext('2d');
+        
+        const ui = {
+            t1: document.getElementById('t1_disp'),
+            d1: document.getElementById('d1_disp'),
+            t2: document.getElementById('t2_disp'),
+            d2: document.getElementById('d2_disp'),
+            v: document.getElementById('v_calc'),
+            measureBtn: document.getElementById('measureBtn'),
+            resetBtn: document.getElementById('resetSimBtn'),
+            speedInput: document.getElementById('speedInput'),
+            speedVal: document.getElementById('speedVal'),
+            intervalInput: document.getElementById('intervalInput'),
+            intervalVal: document.getElementById('intervalVal')
+        };
+
+        // --- 3. 狀態管理 ---
+        const state = {
+            car: {
+                x: 80,    // 這是車的「後保險桿」位置 (面向發射器的一面)
+                speed: 15 // m/s
+            },
+            pulses: [], 
+            
+            // 測量邏輯
+            isMeasuring: false,
+            measureStep: 0, // 0: Idle, 1: Pulse 1 fired, 2: Waiting, 3: Pulse 2 fired
+            pulseInterval: 1.0,
+            nextPulseTime: 0,
+            simTime: 0,
+            
+            // 數據結果
+            result: { d1: null, t1: null, d2: null, t2: null },
+            
+            // CRO 軌跡數據
+            trace1: [],
+            trace2: []
+        };
+
+        // --- 4. 畫布調整 ---
+        function resize() {
+            sceneCanvas.width = sceneCanvas.parentElement.clientWidth;
+            sceneCanvas.height = sceneCanvas.parentElement.clientHeight;
+            croCanvas.width = croCanvas.parentElement.clientWidth;
+            croCanvas.height = croCanvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- 5. 物理引擎 ---
+
+        function spawnPulse(id) {
+            state.pulses.push({
+                id: id,
+                x: 0, 
+                dir: 1, // 1: Right (Emit), -1: Left (Echo)
+                active: true,
+                flightTime: 0,
+            });
+            
+            // 在 CRO 上畫「發射波」 (t=0)
+            const trace = id === 1 ? state.trace1 : state.trace2;
+            addPulseToTrace(trace, 0, 1.0); // t=0, Amplitude=1.0
+        }
+
+        function addPulseToTrace(trace, timeMs, amp) {
+            // 在特定時間點增加一個高斯波形數據
+            const width = 8; // ms
+            for(let t = -width; t <= width; t+=0.5) {
+                trace.push({
+                    t: timeMs + t,
+                    amp: amp * Math.exp(-(t*t)/(width*2))
+                });
+            }
+        }
+
+        function updatePhysics(dt) {
+            state.simTime += dt;
+
+            // 1. 移動汽車
+            if (state.car.speed > 0) {
+                state.car.x += state.car.speed * PIXELS_PER_METER * dt;
+                
+                // 邊界檢查
+                if (state.car.x > sceneCanvas.width / PIXELS_PER_METER - 10) { 
+                    // 讓車停下來，不要超出螢幕太多
+                    state.car.speed = 0;
+                    ui.speedInput.value = 0;
+                    ui.speedVal.innerText = "0 m/s (Out of range)";
+                }
+            }
+
+            // 2. 測量流程控制
+            if (state.isMeasuring) {
+                if (state.measureStep === 2 && state.simTime >= state.nextPulseTime) {
+                    state.measureStep = 3;
+                    spawnPulse(2);
+                    state.isMeasuring = false; 
+                }
+            }
+
+            // 3. 脈衝移動
+            for (let i = state.pulses.length - 1; i >= 0; i--) {
+                let p = state.pulses[i];
+                if (!p.active) continue;
+
+                p.flightTime += dt;
+                
+                // 真實聲速移動
+                const moveDist = SOUND_SPEED * PIXELS_PER_METER * dt;
+                p.x += p.dir * moveDist;
+
+                // --- 碰撞檢測修正 ---
+                // 當脈衝向右(1) 且 接觸到車尾 (car.x)
+                // 考慮脈衝半徑，讓它看起來是碰到邊緣才反彈
+                if (p.dir === 1 && p.x >= state.car.x - PULSE_RADIUS) {
+                    p.dir = -1; // 反彈
+                    p.x = state.car.x - PULSE_RADIUS; // 修正位置，防止穿透
+                }
+
+                // --- 接收檢測 ---
+                if (p.dir === -1 && p.x <= 0) {
+                    p.active = false;
+                    
+                    const totalTimeMs = p.flightTime * 1000;
+                    // 距離計算：(時間 * 聲速) / 2
+                    const distanceM = (p.flightTime * SOUND_SPEED) / 2; 
+                    
+                    // 記錄到 CRO
+                    const trace = p.id === 1 ? state.trace1 : state.trace2;
+                    addPulseToTrace(trace, totalTimeMs, 0.7); // 回聲振幅稍小
+
+                    // 更新 UI
+                    if (p.id === 1) {
+                        state.result.t1 = totalTimeMs;
+                        state.result.d1 = distanceM;
+                        ui.t1.innerText = totalTimeMs.toFixed(1) + " ms";
+                        ui.d1.innerText = distanceM.toFixed(2) + " m";
+                    } else {
+                        state.result.t2 = totalTimeMs;
+                        state.result.d2 = distanceM;
+                        ui.t2.innerText = totalTimeMs.toFixed(1) + " ms";
+                        ui.d2.innerText = distanceM.toFixed(2) + " m";
+                        
+                        // 計算最終速度
+                        const deltaD = state.result.d2 - state.result.d1;
+                        // 速度 = 距離差 / 發射時間差
+                        const v = deltaD / state.pulseInterval;
+                        ui.v.innerText = v.toFixed(1) + " m/s";
+                    }
+                }
+            }
+        }
+
+        // --- 6. 繪圖渲染 ---
+
+        function drawScene() {
+            const w = sceneCanvas.width;
+            const h = sceneCanvas.height;
+            const cy = h / 2;
+
+            sceneCtx.clearRect(0, 0, w, h);
+
+            // 地面
+            sceneCtx.beginPath();
+            sceneCtx.moveTo(0, cy + 20);
+            sceneCtx.lineTo(w, cy + 20);
+            sceneCtx.strokeStyle = '#94a3b8';
+            sceneCtx.stroke();
+
+            // 發射器
+            sceneCtx.fillStyle = '#2563eb';
+            sceneCtx.fillRect(0, cy - 25, 15, 45);
+            sceneCtx.fillStyle = '#fff';
+            sceneCtx.font = '10px sans-serif';
+            sceneCtx.fillText("Tx", 2, cy);
+
+            // --- 繪製汽車 (明確車頭車尾) ---
+            const rearX = state.car.x;
+            const frontX = state.car.x + CAR_WIDTH;
+            const carY = cy - CAR_HEIGHT + 15;
+
+            // 車身
+            sceneCtx.fillStyle = '#ef4444';
+            sceneCtx.beginPath();
+            // 從 rearX 畫到 frontX
+            sceneCtx.roundRect(rearX, carY, CAR_WIDTH, CAR_HEIGHT, [2, 8, 8, 2]); 
+            sceneCtx.fill();
+
+            // 後保險桿 (反射面視覺強化)
+            sceneCtx.fillStyle = '#b91c1c'; // 深紅
+            sceneCtx.fillRect(rearX, carY + 2, 4, CAR_HEIGHT - 4);
+
+            // 車窗
+            sceneCtx.fillStyle = '#fee2e2';
+            sceneCtx.fillRect(rearX + 10, carY + 2, 25, 12);
+
+            // 輪子
+            sceneCtx.fillStyle = '#1e293b';
+            sceneCtx.beginPath();
+            sceneCtx.arc(rearX + 12, carY + CAR_HEIGHT, 7, 0, Math.PI*2);
+            sceneCtx.arc(frontX - 12, carY + CAR_HEIGHT, 7, 0, Math.PI*2);
+            sceneCtx.fill();
+
+            // 標示 "Rear"
+            sceneCtx.fillStyle = '#64748b';
+            sceneCtx.font = '9px sans-serif';
+            sceneCtx.fillText("Rear", rearX - 10, carY - 5);
+
+            // 繪製脈衝
+            state.pulses.forEach(p => {
+                if (!p.active) return;
+                sceneCtx.beginPath();
+                sceneCtx.arc(p.x, cy, PULSE_RADIUS, 0, Math.PI * 2);
+                if (p.id === 1) {
+                    sceneCtx.fillStyle = '#22c55e'; // Green
+                } else {
+                    sceneCtx.fillStyle = '#fbbf24'; // Amber
+                }
+                sceneCtx.fill();
+            });
+        }
+
+        function drawCRO() {
+            const w = croCanvas.width;
+            const h = croCanvas.height;
+            const cy = h / 2;
+            
+            croCtx.clearRect(0, 0, w, h);
+
+            // 分離兩條軌跡的基線 (Vertical Offset)
+            // Trace 1 (Green) 上移
+            const yOffset1 = -h * 0.2; 
+            // Trace 2 (Yellow) 下移
+            const yOffset2 = h * 0.2;
+
+            drawSingleTrace(state.trace1, '#22c55e', cy + yOffset1);
+            drawSingleTrace(state.trace2, '#fbbf24', cy + yOffset2);
+
+            // 畫中心參考線
+            croCtx.beginPath();
+            croCtx.strokeStyle = 'rgba(255,255,255,0.1)';
+            croCtx.setLineDash([2, 4]);
+            croCtx.moveTo(0, cy + yOffset1); croCtx.lineTo(w, cy + yOffset1);
+            croCtx.moveTo(0, cy + yOffset2); croCtx.lineTo(w, cy + yOffset2);
+            croCtx.stroke();
+            croCtx.setLineDash([]);
+        }
+
+        function drawSingleTrace(points, color, baseLineY) {
+            if (points.length === 0) {
+                // 畫一條平直線
+                croCtx.beginPath();
+                croCtx.strokeStyle = color;
+                croCtx.lineWidth = 1;
+                croCtx.moveTo(0, baseLineY);
+                croCtx.lineTo(croCanvas.width, baseLineY);
+                croCtx.stroke();
+                return;
+            }
+
+            const w = croCanvas.width;
+            croCtx.beginPath();
+            croCtx.strokeStyle = color;
+            croCtx.lineWidth = 2;
+            croCtx.lineJoin = 'round';
+
+            points.sort((a,b) => a.t - b.t);
+
+            let lastX = 0;
+            croCtx.moveTo(0, baseLineY);
+
+            points.forEach(pt => {
+                const x = (pt.t / CRO_MAX_TIME) * w;
+                const y = baseLineY - (pt.amp * 30); // Amplitude scale
+
+                // 如果點之間間隔太大，畫回基線 (模擬脈衝是離散的)
+                if (x - lastX > 2) {
+                    croCtx.lineTo(x - 1, baseLineY);
+                }
+                croCtx.lineTo(x, y);
+                lastX = x;
+            });
+
+            // 延伸到最右邊
+            croCtx.lineTo(w, baseLineY);
+            croCtx.stroke();
+        }
+
+        // --- 7. 主循環 ---
+        let lastTime = 0;
+        function loop(timestamp) {
+            const dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            if (dt < 0.1) updatePhysics(dt);
+            drawScene();
+            drawCRO();
+
+            requestAnimationFrame(loop);
+        }
+
+        // --- 8. 事件 ---
+        ui.measureBtn.addEventListener('click', () => {
+            if (state.isMeasuring) return;
+            
+            // 重置數據
+            state.trace1 = [];
+            state.trace2 = [];
+            state.pulses = [];
+            state.result = { d1: null, t1: null, d2: null, t2: null };
+            
+            ui.t1.innerText = "--"; ui.d1.innerText = "--";
+            ui.t2.innerText = "--"; ui.d2.innerText = "--";
+            ui.v.innerText = "-- m/s";
+            
+            // 啟動 Pulse 1
+            state.isMeasuring = true;
+            state.measureStep = 1;
+            spawnPulse(1);
+            
+            // 設定 Pulse 2
+            state.pulseInterval = parseFloat(ui.intervalInput.value);
+            state.nextPulseTime = state.simTime + state.pulseInterval;
+            state.measureStep = 2;
+        });
+
+        ui.speedInput.addEventListener('input', (e) => {
+            state.car.speed = parseInt(e.target.value);
+            ui.speedVal.innerText = state.car.speed + " m/s";
+        });
+
+        ui.intervalInput.addEventListener('input', (e) => {
+            ui.intervalVal.innerText = parseFloat(e.target.value).toFixed(1) + " s";
+        });
+
+        ui.resetBtn.addEventListener('click', () => {
+            state.car.x = 80;
+            state.car.speed = 0;
+            ui.speedInput.value = 0;
+            ui.speedVal.innerText = "0 m/s";
+            
+            state.pulses = [];
+            state.trace1 = [];
+            state.trace2 = [];
+            state.isMeasuring = false;
+            
+            ui.t1.innerText = "--"; ui.d1.innerText = "--";
+            ui.t2.innerText = "--"; ui.d2.innerText = "--";
+            ui.v.innerText = "--";
+        });
+
+        // Start
+        lastTime = performance.now();
+        requestAnimationFrame(loop);
+
+    </script>
+</body>
+</html>
